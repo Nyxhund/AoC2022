@@ -20,24 +20,42 @@ getVals :: [String] -> (Int, Int)
 getVals s = table (head s) (read $ head $ tail s)
 
 -- curr, target, input -> list des coordonnees
-updatePos :: (Int, Int) -> (Int, Int) -> [String] -> [(Int, Int)]
-updatePos (x, y) (z, h) [] =
+updatePos :: (Int, Int) -> (Int, Int) -> [(Int, Int)]
+updatePos (x, y) (z, h) =
     if closeEnough (x, y) (z, h) then
         [(x,y)]
     else
-        (x, y) : updatePos (x + signum (z-x), y + signum (h-y)) (z,h) []
+        (x, y) : updatePos (x + signum (z-x), y + signum (h-y)) (z,h)
 
-updatePos (x, y) (z, h) (s : ts) =
-    if closeEnough (x, y) (z, h) then
-        updatePos (x, y) (z + newZ, h + newH) ts
-    else
-        (x, y) : updatePos (x + signum (z-x), y + signum (h-y)) (z,h) (s:ts)
+mapUpdatePos :: [(Int, Int)] -> [[(Int, Int)]]
+mapUpdatePos [] = []
+mapUpdatePos [k] = [[k]]
+mapUpdatePos [prevKnot, lastKnot] = [updatePos lastKnot prevKnot]
+mapUpdatePos (prevKnot : currKnot : tl) =
+    knotLog : mapUpdatePos (updated : tl)
     where
-        (newZ, newH) = getVals (splitOn " " s)
+        knotLog = updatePos currKnot prevKnot
+        updated = head $ reverse knotLog
+
+getKnotPos :: [[(Int, Int)]] -> [(Int, Int)]
+getKnotPos [] = []
+getKnotPos (knot : tknot) = (head $ reverse knot) : getKnotPos tknot
+
+whereAreWe :: [String] -> [(Int, Int)] -> [(Int, Int)] -> [(Int, Int)]
+whereAreWe [] log _ = log
+whereAreWe (s:ts) log knots =
+    whereAreWe ts (log ++ trace) newKnotsPos
+    where
+        (newX, newY) = getVals (splitOn " " s)
+        (x,y) = head knots
+        updateMatrice = [(x + newX, y + newY)] : mapUpdatePos ((x + newX, y + newY) : (tail knots))
+        trace = head $ reverse updateMatrice
+        newKnotsPos = getKnotPos updateMatrice
 
 main = do
         handle <- readFile "input"
 
         print "First puzzle:"
-        print $ length $ rmvDups $ updatePos (0,0) (0,0) (lines handle)
+        print $ length $ rmvDups $ whereAreWe (lines handle) [] (take 2 (repeat (0,0)))
         print "Second puzzle:"
+        print $ length $ rmvDups $ whereAreWe (lines handle) [] (take 10 (repeat (0,0)))
